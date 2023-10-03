@@ -2,18 +2,28 @@ import 'leaflet/dist/leaflet.css';
 import dynamic from 'next/dynamic';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { BiSolidChevronRight } from 'react-icons/bi';
+
 interface Location {
   lat: string;
   lng: string;
 }
 const LeafletMap = dynamic(() => import('@/component/Map/LeafletMap'), { ssr: false })
-export default function Home() {
-  const [center, setCenter] = useState<[number, number]>([0, 0])
 
+export default function Home({ domainAddress }: any) {
+  const [center, setCenter] = useState<[number, number]>([0, 0])
   const [geolocation, setGeolocation] = useState<any>(null)
-  const [ipAddress, setIpAddress] = useState<any>('192.212.174.101')
-  const ipRef = useRef<HTMLInputElement>(null)
+  const [ipAddress, setIpAddress] = useState<any>('')
+  const [inputAddress, setInputAddress] = useState('')
   const [mapKey, setMapKey] = useState<number>(0);
+  const [invalid, setInValid] = useState(false)
+
+  useEffect(() => {
+    // Fetch the client's IP address from an external service
+    fetch('https://api64.ipify.org?format=json')
+      .then((response) => response.json())
+      .then((data) => setIpAddress(data.ip))
+      .catch((error) => console.error('Error fetching IP address:', error));
+  }, []);
 
   useEffect(() => {
     const fetchGeolocation = async () => {
@@ -39,10 +49,65 @@ export default function Home() {
     updateMapKey()
   }, [center]);
 
+  const isIpAddress = (ipRefAddress: string) => {
+    // Regular expression for IPv4 address
+    const ipv4Regex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+
+    // Regular expression for IPv6 address (simplified for illustration)
+    const ipv6Regex = /^[0-9a-fA-F:]+$/;
+
+    return ipv4Regex.test(ipRefAddress) || ipv6Regex.test(ipRefAddress);
+  }
+
+  const isDomain = (ipRefAddress: string) => {
+    // Regular expression for domain name (simplified for illustration)
+    const domainRegex = /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+    return domainRegex.test(ipRefAddress);
+  }
+
   const fetchIpAddress = async (e: FormEvent) => {
     e.preventDefault()
-    const ipRefAddress = ipRef?.current?.value
-    setIpAddress(ipRefAddress)
+
+
+    const isIp: any = isIpAddress(inputAddress)
+    const isDomainAddress: any = isDomain(inputAddress)
+
+    if (isIp) {
+      try {
+        const response = await fetch(`/api/iptrack?ipAddress=${inputAddress}`)
+        const data = await response.json()
+        setGeolocation(data)
+        const { lat, lng }: Location = data.location;
+        setCenter([parseFloat(lat), parseFloat(lng)])
+      }
+      catch (err) {
+        console.log(err)
+      }
+
+    }
+    else if (isDomainAddress) {
+      try {
+        const response = await fetch(`/api/iptrack?domain=${inputAddress}`)
+        const data = await response.json()
+        setGeolocation(data)
+        const { lat, lng }: Location = data.location;
+        setCenter([parseFloat(lat), parseFloat(lng)])
+      }
+      catch (err) {
+        console.log(err)
+      }
+    }
+    else {
+      console.log("isDomain: ", isDomainAddress, "isIp: ", isIp)
+      console.log("Input valid ipAddress or domain")
+      setInValid(true)
+    }
+  }
+
+  const getInputAddress = (e: any) => {
+    setInputAddress(e.target.value)
+    setInValid(false)
   }
   return (
     <div className='flex flex-col h-screen justify-between'>
@@ -51,9 +116,16 @@ export default function Home() {
           geolocation && (
             <div className='flex flex-col items-center justify-start sm:justify-center gap-5 border-green-500 w-full h-full z-20 top-0 py-5'>
               <h1 className='font-bold text-white text-2xl'>IP Address Tracker</h1>
-              <form onSubmit={(e) => fetchIpAddress(e)} className='flex items-center justify-center w-full px-5 '>
-                <input type='text' ref={ipRef} className='w-full sm:max-w-[500px] py-3 pl-5 rounded-l-md outline-none' placeholder='Search for any IP adddress or domain' />
-                <button type='submit' className='bg-black rounded-r-md py-4 px-4 text-white'><BiSolidChevronRight className="" /></button>
+              <form onSubmit={(e) => fetchIpAddress(e)} className='flex justify-center w-full'>
+                <div className='w-full sm:max-w-[500px] flex flex-col items-start px-5'>
+                  <div className='flex items-center justify-center w-full'>
+                    <input type='text' onChange={(e) => getInputAddress(e)} className={`w-full  py-3 pl-5 rounded-l-xl outline-none ${invalid && ("border-2 border-red-500")}`} placeholder='Search for any IP adddress or domain' />
+                    <button type='submit' className='bg-black rounded-r-md py-4 px-4 text-white'><BiSolidChevronRight className="" /></button>
+                  </div>
+  
+                      <p className={`text-red-500 font-semibold text-xs ${invalid ? "opacity-100" : "opacity-0"}`}>Invalid IP address or domain</p>
+       
+                </div>
               </form>
 
               <div className='flex justify-center absolute top-36 sm:top-48 z-30 max-w-[1000px] w-full px-5 mx-10  border-black'>
@@ -87,3 +159,4 @@ export default function Home() {
     </div>
   )
 }
+

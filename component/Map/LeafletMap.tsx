@@ -15,7 +15,7 @@ const LeafletMap = ({ ipAddress, isp }: any) => {
   });
 
   return (
-    <MapContainer className={style.map} center={ipAddress} zoom={15} scrollWheelZoom={false} zoomControl={false} >
+    <MapContainer className={style.map} center={ipAddress} zoom={15} scrollWheelZoom={true} zoomControl={false} >
       <TileLayer
         url='https://tile.openstreetmap.org/{z}/{x}/{y}.png'
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
